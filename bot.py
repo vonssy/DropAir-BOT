@@ -6,7 +6,7 @@ from aiohttp import (
 from colorama import *
 from datetime import datetime
 from fake_useragent import FakeUserAgent
-import asyncio, json, os, pytz
+import asyncio, time, json, base64, os, pytz
 
 wib = pytz.timezone('Asia/Jakarta')
 
@@ -51,6 +51,12 @@ class DropAir:
         hide_token = token[:3] + '*' * 3 + token[-3:]
         return hide_token
     
+    def decode_token(self, token: str):
+        header, payload, signature = token.split(".")
+        decoded_payload = base64.urlsafe_b64decode(payload + "==").decode("utf-8")
+        parsed_payload = json.loads(decoded_payload)
+        return parsed_payload
+    
     async def user_info(self, token: str):
         url = "https://dropair.io/api/user"
         headers = {
@@ -85,15 +91,45 @@ class DropAir:
     
     async def process_accounts(self, token: str):
         hide_token = self.hide_token(token)
+        token_data = self.decode_token(token)
+        if token_data is None or not "exp" in token_data:
+            self.log(
+                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
+                f"{Fore.RED + Style.BRIGHT}Isn't Valid{Style.RESET_ALL}"
+                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+            )
+            return
         
+        now = int(time.time())
+        exp_time = token_data['exp']
+        exp_time_wib = datetime.fromtimestamp(exp_time, pytz.utc).astimezone(wib).strftime('%x %X %Z')
+        if now >= exp_time:
+            self.log(
+                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
+                f"{Fore.RED + Style.BRIGHT}Is Expired{Style.RESET_ALL}"
+                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+            )
+            return
+        
+        else:
+            self.log(
+                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
+                f"{Fore.GREEN + Style.BRIGHT}Is Valid{Style.RESET_ALL}"
+                f"{Fore.MAGENTA + Style.BRIGHT} ] [ Expired at{Style.RESET_ALL}"
+                f"{Fore.WHITE + Style.BRIGHT} {exp_time_wib} {Style.RESET_ALL}"
+                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+            )
+        await asyncio.sleep(1)
+
         user = await self.user_info(token)
         if not user:
             self.log(
                 f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
                 f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT} Data Is None. {Style.RESET_ALL}"
-                f"{Fore.YELLOW + Style.BRIGHT}Bearer Token May Expired{Style.RESET_ALL}"
+                f"{Fore.RED + Style.BRIGHT}Data Is None{Style.RESET_ALL}"
                 f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
             )
             return
