@@ -8,7 +8,7 @@ Register Here : [DropAir](https://dropair.io/?ref=9S9TD6)
   - Auto Get Account Information
   - Auto Claim Daily Check-In
   - Auto Complete Available Tasks
-  - Multi Accounts With Threads
+  - Multi Accounts
 
 ## Prasyarat
 
