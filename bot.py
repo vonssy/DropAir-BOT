@@ -85,6 +85,7 @@ class DropAir:
     
     async def process_accounts(self, token: str):
         hide_token = self.hide_token(token)
+        
         user = await self.user_info(token)
         if not user:
             self.log(
@@ -175,7 +176,7 @@ class DropAir:
                     seconds -= 1
 
         except FileNotFoundError:
-            self.log(f"{Fore.RED}File 'accounts.txt' Not Found.{Style.RESET_ALL}")
+            self.log(f"{Fore.RED}File 'tokens.txt' Not Found.{Style.RESET_ALL}")
             return
         except Exception as e:
             self.log(f"{Fore.RED+Style.BRIGHT}Error: {e}{Style.RESET_ALL}")
