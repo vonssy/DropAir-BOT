@@ -18,10 +18,10 @@ Register Here : [DropAir](https://dropair.io/?ref=9S9TD6)
 
 1. **Clone The Repositories:**
    ```bash
-   git clone https://github.com/vonssy/Assisterr-BOT.git
+   git clone https://github.com/vonssy/DropAir-BOT.git
    ```
    ```bash
-   cd Assisterr-BOT
+   cd DropAir-BOT
    ```
 
 2. **Install Requirements:**
