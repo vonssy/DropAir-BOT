@@ -111,9 +111,11 @@ class DropAir:
             f"{Fore.WHITE + Style.BRIGHT}{exp_time_wib}{Style.RESET_ALL}"
         )
 
+        balance = "N/A"
+
         user = await self.user_info(token)
         if user:
-            balance = user.get("totalPoints", "N/A")
+            balance = user.get("totalPoints", 0)
 
         self.log(
             f"{Fore.CYAN + Style.BRIGHT}Balance   :{Style.RESET_ALL}"
