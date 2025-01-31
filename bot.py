@@ -52,10 +52,15 @@ class DropAir:
         return hide_token
     
     def decode_token(self, token: str):
-        header, payload, signature = token.split(".")
-        decoded_payload = base64.urlsafe_b64decode(payload + "==").decode("utf-8")
-        parsed_payload = json.loads(decoded_payload)
-        return parsed_payload
+        try:
+            header, payload, signature = token.split(".")
+            decoded_payload = base64.urlsafe_b64decode(payload + "==").decode("utf-8")
+            parsed_payload = json.loads(decoded_payload)
+            username = parsed_payload["username"]
+            exp_time = parsed_payload["exp"]
+            return f"@{username}", exp_time
+        except Exception as e:
+            return None, None
     
     async def user_info(self, token: str):
         url = "https://dropair.io/api/user"
@@ -89,59 +94,35 @@ class DropAir:
         except (Exception, ClientResponseError) as e:
             return None
     
-    async def process_accounts(self, token: str):
-        hide_token = self.hide_token(token)
-        token_data = self.decode_token(token)
-        if token_data is None or not "exp" in token_data:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT}Isn't Valid{Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-            )
-            return
-        
-        now = int(time.time())
-        exp_time = token_data['exp']
+    async def process_accounts(self, token: str, exp_time: int):
         exp_time_wib = datetime.fromtimestamp(exp_time, pytz.utc).astimezone(wib).strftime('%x %X %Z')
-        if now >= exp_time:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT}Is Expired{Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-            )
-            return
         
-        else:
+        if int(time.time()) > exp_time:
             self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Token{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
-                f"{Fore.GREEN + Style.BRIGHT}Is Valid{Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT} ] [ Expired at{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {exp_time_wib} {Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                f"{Fore.CYAN + Style.BRIGHT}Status    :{Style.RESET_ALL}"
+                f"{Fore.RED + Style.BRIGHT} Token Expired {Style.RESET_ALL}"
             )
-        await asyncio.sleep(1)
-
-        user = await self.user_info(token)
-        if not user:
-            self.log(
-                f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-                f"{Fore.WHITE + Style.BRIGHT} {hide_token} {Style.RESET_ALL}"
-                f"{Fore.RED + Style.BRIGHT}Data Is None{Style.RESET_ALL}"
-                f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
-            )
-            return
 
         self.log(
-            f"{Fore.MAGENTA + Style.BRIGHT}[ Account{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} @{user['username']} {Style.RESET_ALL}"
-            f"{Fore.MAGENTA + Style.BRIGHT}] [ Balance{Style.RESET_ALL}"
-            f"{Fore.WHITE + Style.BRIGHT} {user['totalPoints']} DROP {Style.RESET_ALL}"
-            f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT}Status    :{Style.RESET_ALL}"
+            f"{Fore.GREEN + Style.BRIGHT} Token Active {Style.RESET_ALL}"
+            f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+            f"{Fore.CYAN + Style.BRIGHT} Expired at {Style.RESET_ALL}"
+            f"{Fore.WHITE + Style.BRIGHT}{exp_time_wib}{Style.RESET_ALL}"
         )
-        await asyncio.sleep(1)
+
+        user = await self.user_info(token)
+        if user:
+            balance = user.get("totalPoints", "N/A")
+
+        self.log(
+            f"{Fore.CYAN + Style.BRIGHT}Balance   :{Style.RESET_ALL}"
+            f"{Fore.WHITE + Style.BRIGHT} {balance} DROP {Style.RESET_ALL}"
+        )
+
+        self.log(
+            f"{Fore.CYAN + Style.BRIGHT}Task Lists:{Style.RESET_ALL}"
+        )
 
         task_ids = ["daily-task", "follow-twitter-drop3io", "tweet-about-drop", "join-telegram"]
         title = None
@@ -160,20 +141,20 @@ class DropAir:
             complete = await self.complete_tasks(token, task_id)
             if complete and complete['success']:
                 self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}[ Task{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
-                    f"{Fore.GREEN + Style.BRIGHT}Is Completed{Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT} ] [ Reward{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} {complete['points']} DROP {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}]{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}    -> {Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT}{title}{Style.RESET_ALL}"
+                    f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
+                    f"{Fore.CYAN + Style.BRIGHT} Reward {Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT}{complete['points']} DROP{Style.RESET_ALL}"
                 )
             else:
                 self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}[ Task{Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT}Is Already Completed{Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT} ]{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}    -> {Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT}{title}{Style.RESET_ALL}"
+                    f"{Fore.YELLOW + Style.BRIGHT} Is Already Completed {Style.RESET_ALL}"
                 )
+                
             await asyncio.sleep(1)
 
     async def main(self):
@@ -188,16 +169,22 @@ class DropAir:
                     f"{Fore.GREEN + Style.BRIGHT}Account's Total: {Style.RESET_ALL}"
                     f"{Fore.WHITE + Style.BRIGHT}{len(tokens)}{Style.RESET_ALL}"
                 )
-                self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
                 
+                separator = "=" * 25
                 for token in tokens:
-                    token = token.strip()
                     if token:
-                        await self.process_accounts(token)
-                        self.log(f"{Fore.CYAN + Style.BRIGHT}-{Style.RESET_ALL}"*75)
-                        await asyncio.sleep(3)
+                        username, exp_time = self.decode_token(token)
+                        if username and exp_time:
+                            self.log(
+                                f"{Fore.CYAN + Style.BRIGHT}{separator}[{Style.RESET_ALL}"
+                                f"{Fore.WHITE + Style.BRIGHT} {username} {Style.RESET_ALL}"
+                                f"{Fore.CYAN + Style.BRIGHT}]{separator}{Style.RESET_ALL}"
+                            )
+                            await self.process_accounts(token, exp_time)
+                            await asyncio.sleep(3)
 
-                seconds = 86400
+                self.log(f"{Fore.CYAN + Style.BRIGHT}={Style.RESET_ALL}"*60)
+                seconds = 12 * 60 * 60
                 while seconds > 0:
                     formatted_time = self.format_seconds(seconds)
                     print(
