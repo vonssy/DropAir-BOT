@@ -96,12 +96,12 @@ class DropAir:
     
     async def process_accounts(self, token: str, exp_time: int):
         exp_time_wib = datetime.fromtimestamp(exp_time, pytz.utc).astimezone(wib).strftime('%x %X %Z')
-        
         if int(time.time()) > exp_time:
             self.log(
                 f"{Fore.CYAN + Style.BRIGHT}Status    :{Style.RESET_ALL}"
                 f"{Fore.RED + Style.BRIGHT} Token Expired {Style.RESET_ALL}"
             )
+            return
 
         self.log(
             f"{Fore.CYAN + Style.BRIGHT}Status    :{Style.RESET_ALL}"
