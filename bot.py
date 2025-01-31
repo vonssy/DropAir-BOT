@@ -47,10 +47,6 @@ class DropAir:
         minutes, seconds = divmod(remainder, 60)
         return f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
     
-    def hide_token(self, token):
-        hide_token = token[:3] + '*' * 3 + token[-3:]
-        return hide_token
-    
     def decode_token(self, token: str):
         try:
             header, payload, signature = token.split(".")
@@ -62,22 +58,27 @@ class DropAir:
         except Exception as e:
             return None, None
     
-    async def user_info(self, token: str):
+    async def user_info(self, token: str, retries=5):
         url = "https://dropair.io/api/user"
         headers = {
             **self.headers,
             "Cookie": f"auth-token={token}",
             "Content-Type": "application/json"
         }
-        try:
-            async with ClientSession(timeout=ClientTimeout(total=120)) as session:
-                async with session.get(url=url, headers=headers) as response:
-                    response.raise_for_status()
-                    return await response.json()
-        except (Exception, ClientResponseError) as e:
-            return None
+        for attempt in range(retries):
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=120)) as session:
+                    async with session.get(url=url, headers=headers) as response:
+                        response.raise_for_status()
+                        return await response.json()
+            except (Exception, ClientResponseError) as e:
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+
+                return None
         
-    async def complete_tasks(self, token: str, task_id: str):
+    async def complete_tasks(self, token: str, task_id: str, retries=5):
         url = "https://dropair.io/api/tasks"
         data = json.dumps({'taskId':task_id})
         headers = {
@@ -86,13 +87,21 @@ class DropAir:
             "Content-Length": str(len(data)),
             "Content-Type": "application/json"
         }
-        try:
-            async with ClientSession(timeout=ClientTimeout(total=120)) as session:
-                async with session.post(url=url, headers=headers, data=data) as response:
-                    response.raise_for_status()
-                    return await response.json()
-        except (Exception, ClientResponseError) as e:
-            return None
+        for attempt in range(retries):
+            try:
+                async with ClientSession(timeout=ClientTimeout(total=120)) as session:
+                    async with session.post(url=url, headers=headers, data=data) as response:
+                        if response.status == 400:
+                            return None
+                        
+                        response.raise_for_status()
+                        return await response.json()
+            except (Exception, ClientResponseError) as e:
+                if attempt < retries - 1:
+                    await asyncio.sleep(5)
+                    continue
+
+                return None
     
     async def process_accounts(self, token: str, exp_time: int):
         exp_time_wib = datetime.fromtimestamp(exp_time, pytz.utc).astimezone(wib).strftime('%x %X %Z')
@@ -127,7 +136,7 @@ class DropAir:
         )
 
         task_ids = ["daily-task", "follow-twitter-drop3io", "tweet-about-drop", "join-telegram"]
-        title = None
+        title = "Untitled"
         for task_id in task_ids:
             if task_id == "daily-task":
                 title = "Daily Check-In"
@@ -137,24 +146,22 @@ class DropAir:
                 title = "Tweet about DROP"
             elif task_id == "join-telegram":
                 title = "Join Telegram"
-            else:
-                title = "Untitled"
 
             complete = await self.complete_tasks(token, task_id)
-            if complete and complete['success']:
+            if complete and complete.get('success', False):
                 self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}    -> {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{title}{Style.RESET_ALL}"
-                    f"{Fore.GREEN + Style.BRIGHT} Is Completed {Style.RESET_ALL}"
-                    f"{Fore.MAGENTA + Style.BRIGHT}-{Style.RESET_ALL}"
-                    f"{Fore.CYAN + Style.BRIGHT} Reward {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{complete['points']} DROP{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}    ->{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
+                    f"{Fore.GREEN + Style.BRIGHT}Is Completed{Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT} - {Style.RESET_ALL}"
+                    f"{Fore.CYAN + Style.BRIGHT}Reward{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} {complete['points']} DROP {Style.RESET_ALL}"
                 )
             else:
                 self.log(
-                    f"{Fore.MAGENTA + Style.BRIGHT}    -> {Style.RESET_ALL}"
-                    f"{Fore.WHITE + Style.BRIGHT}{title}{Style.RESET_ALL}"
-                    f"{Fore.YELLOW + Style.BRIGHT} Is Already Completed {Style.RESET_ALL}"
+                    f"{Fore.MAGENTA + Style.BRIGHT}    ->{Style.RESET_ALL}"
+                    f"{Fore.WHITE + Style.BRIGHT} {title} {Style.RESET_ALL}"
+                    f"{Fore.YELLOW + Style.BRIGHT}Is Already Completed{Style.RESET_ALL}"
                 )
                 
             await asyncio.sleep(1)
